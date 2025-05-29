@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/auth'
-import { processDocumentPipeline } from '@/lib/document-processor'
+import { finalEnhancedDocumentProcessingPipeline } from '@/lib/document-processor'
 
 export default async function handler(
   req: NextApiRequest,

@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase'
-import { enhancedDocumentProcessingPipeline } from './document-processor'
+import { finalEnhancedDocumentProcessingPipeline } from './document-processor'
 
 export interface BatchProcessingJob {
   id: string

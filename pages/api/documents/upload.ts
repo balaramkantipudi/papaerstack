@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { processDocumentPipeline } from '@/lib/document-processor'
+import { finalEnhancedDocumentProcessingPipeline } from '@/lib/document-processor'
 import formidable from 'formidable'
 import { promises as fs } from 'fs'
 
