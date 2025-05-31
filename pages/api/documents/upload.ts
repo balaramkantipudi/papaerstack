@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { requireAuth } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { processDocumentPipeline } from '@/lib/document-processor'
+import { finalEnhancedDocumentProcessingPipeline } from '@/lib/document-processor'
 import formidable from 'formidable'
 import { promises as fs } from 'fs'
 
@@ -50,7 +50,6 @@ export default async function handler(
     const fileBuffer = await fs.readFile(file.filepath)
     const fileName = `${user.organization_id}/${Date.now()}-${file.originalFilename}`
 
-    // pages/api/documents/upload.ts (continued)
    // Upload to Supabase storage
    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
    .from('original-documents')
@@ -85,7 +84,7 @@ export default async function handler(
  }
 
  // Trigger async processing
- processDocumentPipeline(document.id).catch(error => {
+ finalEnhancedDocumentProcessingPipeline(document.id).catch(error => {
    console.error('Background processing error:', error)
  })
 
