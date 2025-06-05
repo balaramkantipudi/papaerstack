@@ -1,25 +1,39 @@
-import OpenAI from 'openai'
-import { ExtractedDocumentData } from './azure-document-intelligence'
-import { CONSTRUCTION_CATEGORIES, getCategoryByVendor } from './construction-categories'
+import OpenAI from 'openai';
+import { ExtractedDocumentData } from './azure-document-intelligence';
+import { CONSTRUCTION_CATEGORIES, getCategoryByVendor } from './construction-categories';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
-})
+});
+
+export interface LineItemCategory {
+  description: string;
+  suggested_category: string;
+  confidence: number;
+  tax_deductible: boolean;
+}
 
 export interface EnhancedClassificationResult {
-  suggested_category: string
-  confidence: number
-  tax_deductible: boolean
-  project_suggestions: string[]
-  vendor_type: 'supplier' | 'contractor' | 'service' | 'government' | 'other'
-  line_item_categories: Array<{
-    description: string
-    suggested_category: string
-    confidence: number
-    tax_deductible: boolean
-  }>
-  potential_tax_savings: number
-  business_expense_type: 'direct' | 'indirect' | 'administrative'
+  suggested_category: string;
+  confidence: number;
+  tax_deductible: boolean;
+  project_suggestions: string[];
+  vendor_type: 'supplier' | 'contractor' | 'service' | 'government' | 'other';
+  line_item_categories: LineItemCategory[];
+  potential_tax_savings: number;
+  business_expense_type: 'direct' | 'indirect' | 'administrative';
+}
+
+export interface ProjectAllocation {
+  project_id: string;
+  confidence: number;
+  reasoning: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 export async function enhancedConstructionClassification(
@@ -28,7 +42,7 @@ export async function enhancedConstructionClassification(
   try {
     // First, try simple vendor-based classification
     const vendorCategory = extractedData.vendor_name ? 
-      getCategoryByVendor(extractedData.vendor_name) : null
+      getCategoryByVendor(extractedData.vendor_name) : null;
 
     // Create detailed prompt for OpenAI
     const prompt = `
@@ -74,7 +88,7 @@ Provide response in JSON format:
   "potential_tax_savings": 0.00,
   "business_expense_type": "direct/indirect/administrative"
 }
-`
+`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4",
@@ -90,30 +104,30 @@ Provide response in JSON format:
       ],
       temperature: 0.2,
       max_tokens: 1000
-    })
+    });
 
-    const content = response.choices[0].message.content
+    const content = response.choices[0].message.content;
     if (!content) {
-      throw new Error('No response from OpenAI')
+      throw new Error('No response from OpenAI');
     }
 
-    const result = JSON.parse(content) as EnhancedClassificationResult
+    const result = JSON.parse(content) as EnhancedClassificationResult;
 
     // Validate and enhance result
     return {
       ...result,
       suggested_category: vendorCategory || result.suggested_category,
       confidence: Math.min(result.confidence + 0.1, 1.0), // Boost confidence if vendor matched
-    }
+    };
 
   } catch (error) {
-    console.error('Enhanced OpenAI classification error:', error)
+    console.error('Enhanced OpenAI classification error:', error);
     
     // Intelligent fallback based on vendor and amount
     const fallbackCategory = extractedData.vendor_name ? 
-      getCategoryByVendor(extractedData.vendor_name) : 'Office Expenses'
+      getCategoryByVendor(extractedData.vendor_name) : 'Office Expenses';
     
-    const estimatedTaxSavings = (extractedData.total_amount || 0) * 0.25
+    const estimatedTaxSavings = (extractedData.total_amount || 0) * 0.25;
 
     return {
       suggested_category: fallbackCategory,
@@ -129,17 +143,17 @@ Provide response in JSON format:
       })),
       potential_tax_savings: estimatedTaxSavings,
       business_expense_type: 'direct'
-    }
+    };
   }
 }
 
 export async function suggestProjectAllocation(
   documentData: ExtractedDocumentData,
-  organizationProjects: Array<{id: string, name: string, description?: string}>
-): Promise<Array<{project_id: string, confidence: number, reasoning: string}>> {
+  organizationProjects: Project[]
+): Promise<ProjectAllocation[]> {
   
   if (organizationProjects.length === 0) {
-    return []
+    return [];
   }
 
   try {
@@ -165,7 +179,7 @@ Respond in JSON format:
     "reasoning": "why this project matches"
   }
 ]
-`
+`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4",
@@ -181,15 +195,15 @@ Respond in JSON format:
       ],
       temperature: 0.3,
       max_tokens: 500
-    })
+    });
 
-    const content = response.choices[0].message.content
-    if (!content) return []
+    const content = response.choices[0].message.content;
+    if (!content) return [];
 
-    return JSON.parse(content)
+    return JSON.parse(content) as ProjectAllocation[];
 
   } catch (error) {
-    console.error('Project allocation suggestion error:', error)
-    return []
+    console.error('Project allocation suggestion error:', error);
+    return [];
   }
 }

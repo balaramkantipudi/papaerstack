@@ -2,14 +2,14 @@
 import { supabase } from './supabase'
 
 class ApiClient {
-  private async getAuthHeader() {
+  private async getAuthHeader(): Promise<Record<string, string>> {
     const { data: { session } } = await supabase.auth.getSession()
     return session?.access_token ? { 
       'Authorization': `Bearer ${session.access_token}` 
     } : {}
   }
 
-  async uploadDocument(file: File) {
+  async uploadDocument(file: File): Promise<Record<string, unknown>> {
     const formData = new FormData()
     formData.append('file', file)
 
@@ -24,7 +24,7 @@ class ApiClient {
     return response.json()
   }
 
-  async getDocuments(params: Record<string, string> = {}) {
+  async getDocuments(params: Record<string, string> = {}): Promise<Record<string, unknown>> {
     const headers = await this.getAuthHeader()
     const query = new URLSearchParams(params).toString()
     
@@ -35,7 +35,7 @@ class ApiClient {
     return response.json()
   }
 
-  async getDocument(id: string) {
+  async getDocument(id: string): Promise<Record<string, unknown>> {
     const headers = await this.getAuthHeader()
     
     const response = await fetch(`/api/documents/${id}`, {
@@ -45,7 +45,7 @@ class ApiClient {
     return response.json()
   }
 
-  async getDashboardMetrics() {
+  async getDashboardMetrics(): Promise<Record<string, unknown>> {
     const headers = await this.getAuthHeader()
     
     const response = await fetch('/api/dashboard/metrics', {
@@ -55,7 +55,7 @@ class ApiClient {
     return response.json()
   }
 
-  async updateDocument(id: string, updates: Record<string, any>) {
+  async updateDocument(id: string, updates: Record<string, unknown>): Promise<Record<string, unknown>> {
     const headers = await this.getAuthHeader()
     
     const response = await fetch(`/api/documents/${id}`, {

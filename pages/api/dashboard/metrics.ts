@@ -55,7 +55,14 @@ export default async function handler(
       .gte('document.created_at', currentMonth.toISOString())
       .lt('document.created_at', nextMonth.toISOString())
 
-    const categoryBreakdown = categoryData?.reduce((acc, item) => {
+    // Define the correct type for the category data
+    interface CategoryItem {
+      amount: number | null;
+      category: { name: string } | null;
+      document: { organization_id: string; created_at: string };
+    }
+
+    const categoryBreakdown = (categoryData as CategoryItem[] | null)?.reduce((acc, item) => {
       const categoryName = item.category?.name || 'Uncategorized'
       acc[categoryName] = (acc[categoryName] || 0) + (item.amount || 0)
       return acc
@@ -101,6 +108,6 @@ export default async function handler(
 
   } catch (error) {
     console.error('Dashboard metrics error:', error)
-    return res.status(500).json({ error: error.message || 'Internal server error' })
+    return res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 }

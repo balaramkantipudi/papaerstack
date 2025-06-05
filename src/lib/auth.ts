@@ -1,18 +1,52 @@
-import { NextApiRequest } from 'next'
-import { supabaseAdmin } from './supabase'
+import { NextApiRequest } from 'next';
+import { supabaseAdmin } from './supabase';
+import { User } from '@supabase/supabase-js';
 
-export async function getUser(req: NextApiRequest) {
-  const token = req.headers.authorization?.replace('Bearer ', '')
+interface SubscriptionPlan {
+  document_limit: number;
+  user_limit: number;
+}
+
+interface OrganizationSubscription {
+  status: string;
+  plan: SubscriptionPlan;
+}
+
+interface Organization {
+  id: string;
+  name: string;
+  subscription: OrganizationSubscription[];
+}
+
+interface OrganizationMembership {
+  organization_id: string;
+  role: string;
+  organizations: Organization;
+}
+
+export interface AuthenticatedUser extends User {
+  organization_id: string;
+  role: string;
+  organization: Organization;
+}
+
+interface AuthResult {
+  user: AuthenticatedUser | null;
+  error: string | null;
+}
+
+export async function getUser(req: NextApiRequest): Promise<AuthResult> {
+  const token = req.headers.authorization?.replace('Bearer ', '');
   
   if (!token) {
-    return { user: null, error: 'No token provided' }
+    return { user: null, error: 'No token provided' };
   }
 
   try {
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     
     if (error || !user) {
-      return { user: null, error: 'Invalid token' }
+      return { user: null, error: 'Invalid token' };
     }
 
     // Get user's organization membership
@@ -34,10 +68,10 @@ export async function getUser(req: NextApiRequest) {
         )
       `)
       .eq('user_id', user.id)
-      .single()
+      .single();
 
     if (membershipError || !membership) {
-      return { user: null, error: 'User not associated with any organization' }
+      return { user: null, error: 'User not associated with any organization' };
     }
 
     return {
@@ -46,20 +80,20 @@ export async function getUser(req: NextApiRequest) {
         organization_id: membership.organization_id,
         role: membership.role,
         organization: membership.organizations
-      },
+      } as AuthenticatedUser,
       error: null
-    }
+    };
   } catch (error) {
-    return { user: null, error: 'Authentication failed' }
+    return { user: null, error: 'Authentication failed' };
   }
 }
 
-export async function requireAuth(req: NextApiRequest) {
-  const { user, error } = await getUser(req)
+export async function requireAuth(req: NextApiRequest): Promise<AuthenticatedUser> {
+  const { user, error } = await getUser(req);
   
   if (!user) {
-    throw new Error(error || 'Authentication required')
+    throw new Error(error || 'Authentication required');
   }
   
-  return user
+  return user;
 }

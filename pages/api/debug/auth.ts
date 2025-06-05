@@ -19,6 +19,6 @@ export default async function handler(
       error
     })
   } catch (error) {
-    return res.status(500).json({ error: error.message })
+    return res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' })
   }
 }

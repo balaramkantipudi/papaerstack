@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/useAuth'
 
 export default function DocumentUploader() {
   const [uploading, setUploading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<Record<string, unknown> | null>(null)
   const { user } = useAuth()
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -17,7 +17,7 @@ export default function DocumentUploader() {
       const result = await apiClient.uploadDocument(file)
       setResult(result)
     } catch (error) {
-      setResult({ error: error.message })
+      setResult({ error: (error as Error).message })
     } finally {
       setUploading(false)
     }

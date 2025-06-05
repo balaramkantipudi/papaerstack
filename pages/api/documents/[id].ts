@@ -47,7 +47,7 @@ export default async function handler(
       
       const filteredUpdates = Object.keys(updates)
         .filter(key => allowedFields.includes(key))
-        .reduce((obj, key) => {
+        .reduce<Record<string, unknown>>((obj, key) => {
           obj[key] = updates[key]
           return obj
         }, {})
@@ -84,8 +84,8 @@ export default async function handler(
       return res.status(405).json({ error: 'Method not allowed' })
     }
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Document API error:', error)
-    return res.status(500).json({ error: error.message || 'Internal server error' })
+    return res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 }

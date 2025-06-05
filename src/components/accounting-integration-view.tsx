@@ -1,6 +1,5 @@
 import React from "react";
-import { Button, Card, CardBody, Input, Badge, Switch, Tooltip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
-import { motion } from "framer-motion";
+import { Button, Card, CardBody } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
 export const AccountingIntegrationView: React.FC<{ navigateTo: (view: string) => void }> = ({ navigateTo }) => {

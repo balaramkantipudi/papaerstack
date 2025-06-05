@@ -3,10 +3,16 @@ import { Button, Card, CardBody, Progress, Tooltip, Dropdown, DropdownTrigger, D
 import { motion } from "framer-motion";
 import { Icon } from "@iconify/react";
 
+interface ProcessingFile {
+  name: string;
+  progress: number;
+  status: string;
+}
+
 export const DocumentUploadView: React.FC<{ navigateTo: (view: string) => void }> = ({ navigateTo }) => {
   const [dragActive, setDragActive] = React.useState(false);
   const [uploadedFiles, setUploadedFiles] = React.useState<File[]>([]);
-  const [processingFiles, setProcessingFiles] = React.useState<{name: string, progress: number, status: string}[]>([]);
+  const [processingFiles, setProcessingFiles] = React.useState<ProcessingFile[]>([]);
   const [showMobileUpload, setShowMobileUpload] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   
@@ -85,7 +91,7 @@ export const DocumentUploadView: React.FC<{ navigateTo: (view: string) => void }
     fileInputRef.current?.click();
   };
   
-  const handleProcessedDocumentClick = (index: number) => {
+  const handleProcessedDocumentClick = (index: number): void => {
     if (processingFiles[index].progress === 100) {
       navigateTo("document-processing");
     }

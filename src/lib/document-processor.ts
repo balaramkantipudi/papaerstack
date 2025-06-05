@@ -3,8 +3,63 @@ import { processDocumentWithAzure } from './azure-document-intelligence'
 import { enhancedConstructionClassification } from './openai-classification'
 import { VendorRecognitionEngine } from './vendor-recognition'
 import { CacheManager } from './cache-manager'
+import { Database } from '@/types/database'
 
-export async function finalEnhancedDocumentProcessingPipeline(documentId: string) {
+type DocumentType = 'invoice' | 'receipt' | 'bill' | 'statement' | 'other'
+type OcrStatus = 'pending' | 'processing' | 'completed' | 'failed'
+
+interface ExtractedData {
+  vendor_name?: string;
+  document_date?: string;
+  due_date?: string;
+  document_number?: string;
+  total_amount?: number;
+  tax_amount?: number;
+  currency?: string;
+  confidence_scores?: Record<string, number>;
+  line_items?: Array<{
+    description?: string;
+    quantity?: number;
+    unit_price?: number;
+    amount?: number;
+  }>;
+}
+
+interface VendorMatch {
+  vendor_id?: string;
+  vendor_name: string;
+  confidence: number;
+}
+
+interface Classification {
+  confidence: number;
+  potential_tax_savings: number;
+  line_item_categories: Array<{
+    description: string;
+    suggested_category: string;
+    tax_deductible: boolean;
+    confidence: number;
+  }>;
+}
+
+interface CategoryAssignment {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  category_id?: string;
+  tax_deductible: boolean;
+  confidence: number;
+}
+
+export async function finalEnhancedDocumentProcessingPipeline(documentId: string): Promise<{
+  success: boolean;
+  documentId: string;
+  classification: Classification;
+  vendorMatch: VendorMatch;
+  processingTime: number;
+  categoryAssignments: CategoryAssignment[];
+}> {
   console.log(`Starting final enhanced processing for document ${documentId}`)
   
   const cache = CacheManager.getInstance()
@@ -149,32 +204,31 @@ export async function finalEnhancedDocumentProcessingPipeline(documentId: string
         }
       })
 
-      // Add this to the end of your document processing pipeline
-// After step 11 in your existing processor
-
-// 12. Trigger auto-sync webhook if integrations are active
-try {
-  await fetch(`${process.env.NEXTAUTH_URL}/api/webhooks/document-processed`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      document_id: documentId,
-      organization_id: document.organization_id
-    })
-  })
-} catch (error) {
-  console.error('Auto-sync trigger failed:', error)
-  // Don't fail the document processing if auto-sync fails
-}
-    // 12. Cache successful processing patterns
+    // 12. Trigger auto-sync webhook if integrations are active
+    try {
+      const nextAuthUrl = process.env.NEXTAUTH_URL || ''
+      await fetch(`${nextAuthUrl}/api/webhooks/document-processed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          document_id: documentId,
+          organization_id: document.organization_id
+        })
+      })
+    } catch (error) {
+      console.error('Auto-sync trigger failed:', error)
+      // Don't fail the document processing if auto-sync fails
+    }
+    
+    // 13. Cache successful processing patterns
     cache.set(processingKey, {
       vendor_match: vendorMatch,
       classification: classification
     }, 30 * 60 * 1000) // 30 minutes
 
-    // 13. Invalidate related cache entries
+    // 14. Invalidate related cache entries
     cache.delete(`dashboard_metrics_${document.organization_id}`)
     cache.delete(`vendors_${document.organization_id}`)
 
@@ -192,7 +246,7 @@ try {
   } catch (error) {
     console.error('Final enhanced document processing error:', error)
     
-    await updateDocumentStatus(documentId, 'failed', error.message)
+    await updateDocumentStatus(documentId, 'failed', (error as Error).message)
     
     const processingTime = Date.now() - startTime
     await supabaseAdmin
@@ -201,7 +255,7 @@ try {
         document_id: documentId,
         status: 'failed',
         processor: 'final-enhanced-v1',
-        error_message: error.message,
+        error_message: (error as Error).message,
         processing_time: processingTime
       })
 
@@ -209,7 +263,7 @@ try {
   }
 }
 
-async function processDocumentWithRetry(buffer: Buffer, documentType: any, maxRetries = 3) {
+async function processDocumentWithRetry(buffer: Buffer, documentType: DocumentType, maxRetries = 3): Promise<ExtractedData> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await processDocumentWithAzure(buffer, documentType)
@@ -224,13 +278,17 @@ async function processDocumentWithRetry(buffer: Buffer, documentType: any, maxRe
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
     }
   }
+  
+  // This should never be reached due to the throw in the loop above,
+  // but TypeScript needs a return statement
+  throw new Error('Failed to process document after maximum retries')
 }
 
 async function assignSmartCategories(
   organizationId: string,
-  extractedData: any,
-  classification: any
-) {
+  extractedData: ExtractedData,
+  classification: Classification
+): Promise<CategoryAssignment[]> {
   // Get organization's categories
   const { data: categories } = await supabaseAdmin
     .from('expense_categories')
@@ -239,8 +297,8 @@ async function assignSmartCategories(
 
   const categoryMap = new Map(categories?.map(cat => [cat.name, cat.id]) || [])
 
-  return classification.line_item_categories.map((item: any, index: number) => {
-    const originalItem = extractedData.line_items[index] || {}
+  return classification.line_item_categories.map((item, index) => {
+    const originalItem = extractedData.line_items?.[index] || {}
     return {
       description: item.description,
       quantity: originalItem.quantity || 1,
@@ -255,10 +313,14 @@ async function assignSmartCategories(
 
 async function updateDocumentStatus(
   documentId: string, 
-  status: 'pending' | 'processing' | 'completed' | 'failed',
+  status: OcrStatus,
   errorMessage?: string
-) {
-  const updateData: any = { ocr_status: status, updated_at: new Date().toISOString() }
+): Promise<void> {
+  const updateData: Record<string, unknown> = { 
+    ocr_status: status, 
+    updated_at: new Date().toISOString() 
+  }
+  
   if (errorMessage) {
     updateData.ocr_error = errorMessage
   }

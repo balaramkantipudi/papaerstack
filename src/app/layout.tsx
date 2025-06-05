@@ -35,15 +35,13 @@
 
 
 // app/layout.tsx
-
-// globals.css includes @tailwind directives
-// adjust the path if necessary
 import type { Metadata } from 'next';
-//import './globals.css';
+import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Your App',
-  description: 'Your App Description',
+  title: 'Paperstack',
+  description: 'Document processing and management for construction companies',
 };
 
 export default function RootLayout({
@@ -53,7 +51,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="antialiased">
+        <Providers>
+          {children}
+        </Providers>
+      </body>
     </html>
   );
 }
